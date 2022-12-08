@@ -1,0 +1,10 @@
+version: 0
+tlsconfig:
+  certpath: ""
+  keypath: ""
+  peercacertpath: ../crypto-config/peerOrganizations/org1.secretidentity.com/peers/peer0.org1.secretidentity.com/msp/tlscacerts/tlsca.org1.secretidentity.com-cert.pem
+  timeout: 0s
+signerconfig:
+  mspid: Org1MSP
+  identitypath: ../crypto-config/peerOrganizations/org1.secretidentity.com/users/User1@org1.secretidentity.com/msp/signcerts/User1@org1.secretidentity.com-cert.pem
+  keypath: ../crypto-config/peerOrganizations/org1.secretidentity.com/users/User1@org1.secretidentity.com/msp/keystore/priv_sk

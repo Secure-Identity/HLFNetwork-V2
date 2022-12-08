@@ -1,0 +1,131 @@
+name: "Basic"
+x-type: "hlfv1"
+description: "Basic network"
+version: "1.0"
+channels:
+  mychannel:
+    orderers:
+      - orderer.secretidentity.com
+
+    peers:
+      peer0.org1.secretidentity.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+      peer1.org1.secretidentity.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+      peer2.org1.secretidentity.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+      peer3.org1.secretidentity.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+      peer4.org1.secretidentity.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+    chaincodes:
+      - mycc:v0
+
+organizations:
+  Org1:
+    mspid: Org1MSP
+
+    peers:
+      - peer0.org1.secretidentity.com
+      - peer1.org1.secretidentity.com
+      - peer2.org1.secretidentity.com
+      - peer3.org1.secretidentity.com
+      - peer4.org1.secretidentity.com
+
+    certificateAuthorities:
+      - ca.org1.secretidentity.com
+
+    adminPrivateKey:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/users/Admin@org1.secretidentity.com/msp/keystore/priv_sk
+    signedCert:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/users/Admin@org1.secretidentity.com/msp/signcerts/Admin@org1.secretidentity.com-cert.pem
+
+orderers:
+  orderer.secretidentity.com:
+    url: grpcs://localhost:7050
+    grpcOptions:
+      ssl-target-name-override: orderer.secretidentity.com
+    tlsCACerts:
+      path: ../artifacts/channel/crypto-config/ordererOrganizations/secretidentity.com/orderers/orderer.secretidentity.com/tls/ca.crt
+
+#
+# List of peers to send various requests to, including endorsement, query
+# and event listener registration.
+#
+peers:
+  peer0.org1.secretidentity.com:
+    url: grpcs://localhost:7051
+
+    grpcOptions:
+      ssl-target-name-override: peer0.org1.secretidentity.com
+    tlsCACerts:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/peers/peer0.org1.secretidentity.com/tls/ca.crt
+
+  peer1.org1.secretidentity.com:
+    url: grpcs://localhost:8051
+
+    grpcOptions:
+      ssl-target-name-override: peer1.org1.secretidentity.com
+    tlsCACerts:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/peers/peer1.org1.secretidentity.com/tls/ca.crt
+
+  peer2.org1.secretidentity.com:
+    url: grpcs://localhost:9051
+
+    grpcOptions:
+      ssl-target-name-override: peer2.org1.secretidentity.com
+    tlsCACerts:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/peers/peer2.org1.secretidentity.com/tls/ca.crt
+
+  peer3.org1.secretidentity.com:
+    url: grpcs://localhost:10051
+
+    grpcOptions:
+      ssl-target-name-override: peer3.org1.secretidentity.com
+    tlsCACerts:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/peers/peer3.org1.secretidentity.com/tls/ca.crt
+
+  peer4.org1.secretidentity.com:
+    url: grpcs://localhost:10051
+
+    grpcOptions:
+      ssl-target-name-override: peer4.org1.secretidentity.com
+    tlsCACerts:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/peers/peer4.org1.secretidentity.com/tls/ca.crt
+#
+# Fabric-CA is a special kind of Certificate Authority provided by Hyperledger Fabric which allows
+# certificate management to be done via REST APIs. Application may choose to use a standard
+# Certificate Authority instead of Fabric-CA, in which case this section would not be specified.
+#
+certificateAuthorities:
+  ca.org1.secretidentity.com:
+    url: https://localhost:7054
+    httpOptions:
+      verify: false
+    tlsCACerts:
+      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.secretidentity.com/ca/ca.org1.secretidentity.com-cert.pem
+
+    registrar:
+      - enrollId: admin
+        enrollSecret: adminpw
+    caName: ca.org1.secretidentity.com
