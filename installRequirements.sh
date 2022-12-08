@@ -45,5 +45,5 @@ sudo chmod 666 /var/run/docker.sock
 wget https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
 chmod +x install-fabric.sh
 ./install-fabric.sh docker
-mkdir ~/secureID && cd ~/secureID
+mkdir $HOME/secureID && cd $HOME/secureID
 curl -sSL https://bit.ly/2ysbOFE | bash -s - 2.4.7 1.5 0.4.18
