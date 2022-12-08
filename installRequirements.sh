@@ -25,15 +25,6 @@ sudo apt-get install -y docker-ce
 sudo apt-get install docker-compose
 sudo apt-get upgrade
 
-wget https://go.dev/dl/go1.19.3.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.19.3.linux-amd64.tar.gz
-export PATH=$PATH:/usr/local/go/bin
-echo "---------------------------"
-echo "go installed successfully!"
-go version
-echo "---------------------------"
-
-
 curl -sL https://deb.nodesource.com/setup_14.x | sudo bash -
 sudo apt-get install -y nodejs
 
