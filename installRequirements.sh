@@ -1,0 +1,49 @@
+#!/bin/sh
+
+cd ~
+apt-get update
+apt-get install curl
+apt-get install nodejs
+apt-get install npm
+apt-get install python
+
+sudo apt-get install \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  bionic stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get install docker.io
+apt-get update
+apt-cache policy docker-ce
+sudo apt-get install -y docker-ce
+sudo apt-get install docker-compose
+sudo apt-get upgrade
+
+wget https://go.dev/dl/go1.19.3.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.19.3.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+echo "---------------------------"
+echo "go installed successfully!"
+go version
+echo "---------------------------"
+
+
+curl -sL https://deb.nodesource.com/setup_14.x | sudo bash -
+sudo apt-get install -y nodejs
+
+sudo service docker start
+sudo groupadd docker
+sudo usermod -aG docker $USER
+sudo chmod 666 /var/run/docker.sock
+
+mkdir secretIdentity && cd secretIdentity
+wget https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
+chmod +x install-fabric.sh
+./install-fabric.sh docker
+
