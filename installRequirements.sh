@@ -42,7 +42,8 @@ sudo groupadd docker
 sudo usermod -aG docker $USER
 sudo chmod 666 /var/run/docker.sock
 
-mkdir ~/secretID && cd ~/secretID
 wget https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
 chmod +x install-fabric.sh
 ./install-fabric.sh docker
+mkdir ~/secureID && cd ~/secureID
+curl -sSL https://bit.ly/2ysbOFE | bash -s - 2.4.7 1.5 0.4.18
