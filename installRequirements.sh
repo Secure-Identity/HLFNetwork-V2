@@ -1,11 +1,11 @@
 #!/bin/sh
 
 cd ~
-apt-get update
-apt-get install curl
-apt-get install nodejs
-apt-get install npm
-apt-get install python
+sudo apt-get update
+sudo apt-get install curl
+sudo apt-get install nodejs
+sudo apt-get install npm
+sudo apt-get install python-is-python3
 
 sudo apt-get install \
     ca-certificates \
