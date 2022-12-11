@@ -7,6 +7,8 @@ sudo apt-get install nodejs
 sudo apt-get install npm
 sudo apt-get install python-is-python3
 
+sudo npm install -g nodemon
+
 sudo apt-get install \
     ca-certificates \
     curl \
