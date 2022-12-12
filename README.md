@@ -1,5 +1,10 @@
 # HLFNetwork-V2
-The second implementation of the fabric network which involves API calls and separate couchdb instances for each peer.
+The V2 implementation of the fabric network which involves API calls and separate CouchDB instances for each peer.
+
+## AWS EC2 Setup
+1. Create a new EC2 Ubuntu instance with more than 50gb of storage.
+2. SLAC employees can use the launch-wizard-18 security group, otherwise ensure that port 4000 (App) and 5984 (CouchDB) are open
+3. SSH into the instance and clone this repository using `git clone https://github.com/Secure-Identity/HLFNetwork-V2`
 
 After cloning the repository and switching to the HLFNetwork-V2 directory, follow the steps:
 
