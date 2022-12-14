@@ -47,8 +47,11 @@ Copy the token from the response and use that as the bearer token in the followi
 - We'll use IPs of dev-peer.... docker containers only.
 1. ProvisionID: `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureID?args=["DEVICE"]&peer=peer0.org1.secretidentity.com&fcn=provisionID`
 2. Sharding: `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureID?args=["DEVICE0"]&peer=peer0.org1.secretidentity.com&fcn=keymaker`
-3. Listen Shards: `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureidfinal?args=["<listener-docker-container-IP>"]&peer=peer0.org1.secretidentity.com&fcn=listenShard`
-4. Send Shards: `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureidfinal?args=["<sender-docker-container-IP>"]&peer=peer0.org1.secretidentity.com&fcn=sendShard`
+3. Listen Shards: `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureID?args=["<listener-docker-container-IP>"]&peer=peer0.org1.secretidentity.com&fcn=listenShard`
+5. Send Single Shard: `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureID?args=["something"]&peer=peer0.org1.secretidentity.com&fcn=sendSingleShard`
+6. Get K shards: `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureID?args=["something"]&peer=peer0.org1.secretidentity.com&fcn=getShardsK`
+4. Keychecker (ID verification): `http://<ec2-instance-ip>:4000/channels/mychannel/chaincodes/secureID?args=["something"]&peer=peer0.org1.secretidentity.com&fcn=keychecker`
+
  
 ## References
  1. https://hyperledger-fabric.readthedocs.io/en/latest/test_network.html
