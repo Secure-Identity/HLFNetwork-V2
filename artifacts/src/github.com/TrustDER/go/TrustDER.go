@@ -26,9 +26,17 @@ import (
 )
 
 const (
-	SERVER_HOST = "localhost"
+	// Port for the shard distribution. This is for the step where a
+	// peer distributes its shards to all the other trusted peers
 	SERVER_PORT = "1234"
+	// Port for getting shards to the verifier from k trusted peers
+	// and the peer that needs to be verified
+	SERVER_PORT2 = "1235"
+	// Server type is tcp as we're opening up a TCP socket
 	SERVER_TYPE = "tcp"
+	// The domain should be changed to match the name of the chaincode
+	// Shoud follow syntax: ".org1.secretidentity.com-<chaincode_name>_1"
+	SERVER_DOMAIN = ".org1.secretidentity.com-secureID_1"
 	order       = 1000
 )
 
@@ -81,6 +89,12 @@ func (s *SmartContract) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response 
 		return s.sendShard(APIstub, args)
 	case "listenShard":
 		return s.listenShard(APIstub)
+	case "sendSingleShard":
+		return s.sendSingleShard(APIstub)
+	case "getShardsK":
+		return s.getShardsK(APIstub)
+	case "keychecker":
+		return s.keychecker(APIstub, args)
 	default:
 		return shim.Error("Invalid Smart Contract function name.")
 	}
@@ -323,6 +337,8 @@ func (t *SmartContract) getHistoryForAsset(stub shim.ChaincodeStubInterface, arg
 	return shim.Success(buffer.Bytes())
 }
 
+// Smart contract that provisions an identity for a peer. It generates an
+// ed25519 private/public key pair and stores them in /tmp
 func (s *SmartContract) provisionID(APIstub shim.ChaincodeStubInterface) sc.Response{
 	pubKey, privKey, _ := ed25519.GenerateKey(crand.Reader)
 	publicKey, _ := ssh.NewPublicKey(pubKey)
@@ -358,6 +374,10 @@ func (s *SmartContract) provisionID(APIstub shim.ChaincodeStubInterface) sc.Resp
 	return shim.Success(nil)
 }
 
+// Smart contract that implements the keymaker protocol. It generates a
+// random key, generates an equation using the random key and generates
+// shards lying on the equation. It then encrypts the private key of the
+// peer with the random key and appends that to the generated shards
 func (s *SmartContract) keymaker(APIstub shim.ChaincodeStubInterface) sc.Response {
 
 	rand.Seed(time.Now().UnixNano())
@@ -391,6 +411,9 @@ func (s *SmartContract) keymaker(APIstub shim.ChaincodeStubInterface) sc.Respons
 	return shim.Success([]byte(result))
 }
 
+// Helper function that takes the random key and k as arguments and
+// generates a polynomial equation of degree k with the random key
+// as the intercept.
 func genEquation(randomKey int64, k int64) []int64 {
 	rand.Seed(time.Now().UnixNano())
 	var poly []int64
@@ -402,6 +425,9 @@ func genEquation(randomKey int64, k int64) []int64 {
 	return poly
 }
 
+// Helper function that takes a slice containing polynomial constants
+// and returns two slices representing (x,y) points lying on the line
+// formed by the constants.
 func genShards(poly []int64) ([]float64, []float64) {
 	rand.Seed(time.Now().UnixNano())
 	var dist []float64
@@ -417,6 +443,9 @@ func genShards(poly []int64) ([]float64, []float64) {
 	return dist, y
 }
 
+// Helper function that takes a slice containing polynimial constants
+// and a slice containing x values as input and returns a slice
+// containing values obtained from solving the equation using each x
 func solveWithX(poly []int64, x []float64) []float64 {
 	var yvals []float64
 	for _, v := range x {
@@ -429,10 +458,12 @@ func solveWithX(poly []int64, x []float64) []float64 {
 	return yvals
 }
 
+// Helper function that takes the random key as input and encrypts the
+// private key/ID of the peer and returns the cipher to the caller
 func encryptKey(randomKey int64) (string, error) {
 	plaintext, err := os.ReadFile("/tmp/testID")
 	if err != nil {
-		return "", fmt.Errorf("%s", err)
+		return shim.Error(err)
 	}
 
 	key := big.NewInt(randomKey)
@@ -441,7 +472,7 @@ func encryptKey(randomKey int64) (string, error) {
 
 	var nonce [24]byte
 	if _, err := io.ReadFull(crand.Reader, nonce[:]); err != nil {
-		return "", fmt.Errorf("%s", err)
+		return shim.Error(err)
 	}
 	encrypted := secretbox.Seal(nonce[:], plaintext, &nonce, &keybuf)
 	encoded := base64.StdEncoding.EncodeToString(encrypted)
@@ -449,6 +480,11 @@ func encryptKey(randomKey int64) (string, error) {
 	return encoded, nil
 }
 
+// Helper function that takes generated x and y slices and the cipher
+// text as input. It converts the (x,y) points to a 16-byte (8,8)
+// representation and appends the ciphertext to it. It then performs
+// a base64 encode on the obtained byte-string and returns the resulting
+// slice of byte slices as the shards to be stored
 func distShards(shardsX, shardsY []float64, cipher string) [][]byte {
 	var shards [][]byte
 	cipher = cipher + "\n"
@@ -469,6 +505,8 @@ func distShards(shardsX, shardsY []float64, cipher string) [][]byte {
 	return shards
 }
 
+// Smart contract to receive a single shard from a peer. It stores the
+// received shards at /tmp/shard.txt
 func (s *SmartContract) listenShard(APIstub shim.ChaincodeStubInterface) sc.Response {
 	fmt.Println("Start listening on port " + SERVER_PORT + "...")
 
@@ -502,47 +540,241 @@ func (s *SmartContract) listenShard(APIstub shim.ChaincodeStubInterface) sc.Resp
 	return shim.Success([]byte(result))
 }
 
-func (s *SmartContract) sendShard(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+// Smart contract to distribute the shards stored on a peer to all
+// other trusted peers in the network including itself
+func (s *SmartContract) sendShard(APIstub shim.ChaincodeStubInterface) sc.Response {
 
-	if len(args) != 1 {
-		return shim.Error("Incorrect number of arguments. Please send the listening server name!")
-	}
+	// List of names of trusted peers and the peer itself
+	peers := [...]string{"dev-peer4", "dev-peer3", "dev-peer2", "dev-peer1", "dev-peer0"}
 
-	SERVER_NAME := args[0]
-
+	// Reading from the file containing all shards of the peer
 	fp, err := os.Open("/tmp/data.txt")
 	if err != nil {
-		return shim.Error(err.Error())
+		return shim.Error(err)
 	}
 	defer fp.Close()
 	fileScanner := bufio.NewScanner(fp)
 	fileScanner.Split(bufio.ScanLines)
 	var text []string
+	// Reading line by line and storing them in a slice
 	for fileScanner.Scan() {
 		text = append(text, fileScanner.Text())
 	}
-	//for _, reader := range text {
-	//	// what to send?
-	//	shard := []byte(reader)
-	//	x := big.NewInt(0)
-	//	y := big.NewInt(0)
-	//	x = x.SetBytes(shard[:8])
-	//	y = y.SetBytes(shard[8:16])
-	//	fmt.Println(x.String() + " " + y.String())
-	//}
-	conn, err := net.Dial(SERVER_TYPE, SERVER_NAME+":"+SERVER_PORT)
-	if err != nil {
-		return shim.Error(err.Error())
+
+	// Making a slice of Connection objects to connect to all the trusted peers
+	var conns = make([]net.Conn, 5)
+	// Dialing to each peer
+	for i, peer := range peers {
+		conn, err := net.Dial(SERVER_TYPE, peer+SERVER_DOMAIN+":"+SERVER_PORT)
+		if err != nil {
+			return shim.Error(err)
+		}
+		conns[i] = conn
 	}
-	defer conn.Close()
-	//for _, reader := range text {
-	//	// what to send?
-	//	fmt.Print("Text to send: ")
-	//	// send to server
-	//	conn.Write([]byte(reader + "\n"))
-	//}
-	conn.Write([]byte(text[0] + "\n"))
+
+	// Sending one shard to each peer where peer4 receives shard0 and so on
+	for i, conn := range conns {
+		_, err = conn.Write([]byte(text[i] + "\n"))
+		if err != nil {
+			return shim.Error(err)
+		}
+		err = conn.Close()
+		if err != nil {
+			return shim.Error(err)
+		}
+	}
 	return shim.Success([]byte("Shards sent"))
+}
+
+// Smart contract to receive shards sent by k trusted peers and by
+// the device to be verified. The shards are stored as shard[i].txt
+func (s *SmartContract) getShardsK(APIstub shim.ChaincodeStubInterface) sc.Response {
+	var shards []string
+
+	// listen on port SERVER_PORT2
+	ln, err := net.Listen(SERVER_TYPE, ":"+SERVER_PORT2)
+	if err != nil {
+		return shim.Error(err)
+	}
+	defer ln.Close()
+	// Receive 4 shards from 4 peers
+	for i := 0; i < 4; i++ {
+		// accept connection
+		conn, err := ln.Accept()
+		if err != nil {
+			return shim.Error(err)
+		}
+		// Buffer to read the shard
+		buffer := make([]byte, 1024)
+		_, err = conn.Read(buffer)
+		if err != nil {
+			return shim.Error(err)
+		}
+		// Forming the file name
+		fname := "/tmp/shard" + string(i+48) + ".txt"
+		shards = append(shards, string(buffer[:]))
+		shards = append(shards, "\n")
+		// Creating a file with the formed name
+		f, err := os.Create(fname)
+		if err != nil {
+			return shim.Error(err)
+		}
+		// Writing to the file
+		f.Write(buffer)
+		f.Close()
+		conn.Close()
+	}
+	result := "Shards for verification received"
+	return shim.Success([]byte(result))
+}
+
+// Smart contract to send a single shard to a verifier. It is run on
+// k trusted peers to send their shards to the verifier peer
+func (s *SmartContract) sendSingleShard(APIstub shim.ChaincodeStubInterface) sc.Response {
+	// Name of the verifier peer
+	verifier := "dev-peer1"
+
+	// Reading from the file containing the shard on the peer
+	fp, err := os.Open("/tmp/shard.txt")
+	if err != nil {
+		return shim.Error(err)
+	}
+	defer fp.Close()
+	fileScanner := bufio.NewScanner(fp)
+	fileScanner.Split(bufio.ScanLines)
+	var text []string
+	// Reading the first line of the file as this is the line
+	// containing the shard
+	for fileScanner.Scan() {
+		text = append(text, fileScanner.Text())
+	}
+	// Dialing to the verifier shard
+	conn, err := net.Dial(SERVER_TYPE, verifier+SERVER_DOMAIN+":"+SERVER_PORT2)
+	if err != nil {
+		return shim.Error(err)
+	}
+	// Sending the shard to the verifier
+	_, err = conn.Write([]byte(text[0] + "\n"))
+	if err != nil {
+		return shim.Error(err)
+	}
+	err = conn.Close()
+	if err != nil {
+		return shim.Error(err)
+	}
+	return shim.Success([]byte("Shards sent"))
+}
+
+// Smart contract to decode the shards and perform the verification of
+// an untrusted peer on the verifier using Lagrange interpolation formula
+func (s *SmartContract) keychecker(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+
+	// Read and decode all the shards
+	x_shards, y_shards, err := decodeShards()
+	if err != nil {
+		return shim.Error(err)
+	}
+	var result string
+	// Perform the verification and get appropriate string depending on the result
+	if verify(x_shards, y_shards) {
+		result = "verified"
+	} else {
+		result = "not verified"
+	}
+	// Modify the ledger with the result
+	err = stub.PutState(args[0], []byte(result))
+	if err != nil {
+		return shim.Error(err)
+	}
+	return shim.Success([]byte(result))
+}
+
+// Helper function to read all the shards residing on the verifier and
+// decode them to get (x,y) points and return 2 slices, one containing
+// x values and the other containing y values
+func decodeShards() ([]float64, []float64, error) {
+	var shards = make([]string, 4)
+
+	var x_shards = make([]float64, 4)
+	var y_shards = make([]float64, 4)
+	for i := 0; i < 4; i++ {
+		// Read shard from file
+		fname := "/tmp/shard" + string(i+48) + ".txt"
+		fp, err := os.Open(fname)
+		if err != nil {
+			return shim.Error(err)
+		}
+		fileScanner := bufio.NewScanner(fp)
+		var text []string
+		fileScanner.Split(bufio.ScanLines)
+		for fileScanner.Scan() {
+			text = append(text, fileScanner.Text())
+		}
+		// Store shard in slice
+		shards[i] = text[0]
+		err = fp.Close()
+		if err != nil {
+			return shim.Error(err)
+		}
+	}
+	for i, shard := range shards {
+		// Decode shard from base64
+		decoded, err := base64.StdEncoding.DecodeString(shard)
+		if err != nil {
+			return shim.Error(err)
+		}
+		x := big.NewInt(0)
+		y := big.NewInt(0)
+		// Extract first 8 bytes of shard as x
+		x = x.SetBytes(decoded[:8])
+		// Extract bytes 8 to 16 of shard as y
+		y = y.SetBytes(decoded[8:16])
+		x_shards[i] = float64(x.Int64())
+		y_shards[i] = float64(y.Int64())
+	}
+	return x_shards, y_shards, nil
+}
+
+// Helper function that takes 2 slices containing x values and y
+// values as input, performs the verification for the unverified
+// peer and returns a Boolean output
+func verify(shardX []float64, shardY []float64) bool {
+	// Set the last shard in the slice as the shard of the unverified peer
+	device_x := shardX[len(shardX)-1]
+	device_y := math.Round(shardY[len(shardY)-1])
+
+	// Remove above shard from the slices
+	shardX = shardX[:len(shardX)-1]
+	shardY = shardY[:len(shardY)-1]
+
+	// Calculate interpolated y value of the unverified peer's x using
+	// Lagrange interpolation with the other shards
+	interpolatedY := lagrangePoly(device_x, shardX, shardY)
+
+	// Check if interpolated y value matches the shard y value
+	return device_y == interpolatedY
+}
+
+// Helper function that implements Lagrange interpolation formula. It takes an
+// x value and 2 slices, one containing x values and the other containing y values
+// as input. It implements Lagrange interpolation on the x value using the (x,y)
+// values and returns the resulting y value
+func lagrangePoly(device_x float64, shardsX []float64, shardsY []float64) float64 {
+	sum := float64(0)
+	for i, v := range shardsY {
+		prod := float64(1)
+		for j, x := range shardsX {
+			if i != j {
+				num := device_x - x
+				den := shardsX[i] - x
+				div := num / den
+				prod = prod * div
+			}
+		}
+		sum = sum + v*prod
+	}
+
+	return math.Round(sum)
 }
 
 func main() {
